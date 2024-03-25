@@ -1,0 +1,420 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Name : Ayush Singoria\
+Roll number: 6A\
+Assignment 2 RTSM
+
+```{r}
+# # Required Packages
+packages = c('quantmod','car','forecast','tseries','FinTS', 'rugarch','utf8','ggplot2')
+# 
+# # Install all Packages with Dependencies
+#
+#install.packages(packages, dependencies = TRUE)
+# 
+# # Load all Packages
+lapply(packages, require, character.only = TRUE)
+```
+
+**Downloading the HUL Stock data**
+
+```{r}
+getSymbols(Symbols = 'HINDUNILVR.NS', 
+           src = 'yahoo', 
+           from = as.Date('2018-01-01'), 
+           to = as.Date('2023-12-31'),
+           periodicity = 'daily')
+# xts (Time-Series) Object
+```
+
+**Sanitization of the data**
+
+```{r}
+# Extract Adjusted Closing Price and remove missing values
+stock_price = na.omit(HINDUNILVR.NS$HINDUNILVR.NS.Adjusted)
+class(stock_price)
+View(stock_price)
+```
+
+**Examine the structure of the stock price object.**
+
+**Result:**
+
+-   The output confirms stock is an xts object containing daily adjusted closing prices for "HINDUNILVR.NS" stock from January 1st, 2018, to December 29th, 2023 (1481 observations).
+
+**Analysis:**
+
+-   The data is in a time series format with dates as the index.
+
+-   Knowing the data source (Yahoo) and update time (March 24th, 2024) provides context.
+
+```{r}
+#Checking for the structure of the stock_price
+str(stock_price)
+```
+
+**Confirming if there are any null values in the series\
+output:** No there is no Null value
+
+```{r}
+# Confirming if there are any null values in the series
+any_null = any(is.null(stock_price))
+any_null
+```
+
+**Visualising the time series data**
+
+```{r}
+#Visualising the time series data 
+plot(stock_price)
+```
+
+**Forecasting using Simple Moving Average (SMA)\
+\
+Objective:** To demonstrate the computation and visualization of the Simple Moving Average (SMA) and the Simple Moving Average Random Walk Forecast with Drift for a given stock price dataset.\
+**\
+Analysis:**
+
+-   The SMA with a window size of 4 provides a smoothed representation of the original stock price data, allowing for easier identification of trends.
+
+-   The plot illustrates how the SMA line follows the general trend of the stock price while smoothing out short-term fluctuations.
+
+```{r}
+# Simple Moving Average [SMA]
+
+stock_price_ma4 = ma(stock_price, order = 4) 
+
+plot(stock_price, lwd = 2)
+
+lines(stock_price_ma4, col = 'blue', lwd = 20)
+
+
+```
+
+```{r}
+# Simple Moving Average : Random Walk (with Drift) Forecast
+stock_price_ma8 = rwf(stock_price, h = 500, drift = TRUE) 
+accuracy(stock_price_ma8)
+
+plot(stock_price_ma8)
+```
+
+**Forecasting using Exponentially Weighted Moving Average (EWMA)\
+\
+Objective:** Forecast the future stock prices for the next 500 periods using Simple Exponential Smoothing (SES).\
+\
+**Results:**
+
+-   The output table displays several accuracy measures:
+
+    -   ME (Mean Error): 1.176946 (indicates a slight bias towards underestimating future prices)
+    -   RMSE (Root Mean Squared Error): 21.98572 (measures the overall magnitude of the forecast errors)
+    -   MAE (Mean Absolute Error): 13.13919 (represents the average absolute difference between forecasts and actual prices)
+    -   MPE (Mean Percentage Error): 0.1053299 (expresses the average error as a percentage of the actual values)
+    -   MAPE (Mean Absolute Percentage Error): 1.129559 (similar to MPE but uses absolute values)
+    -   MASE (Mean Absolute Scaled Error): 1.081948 (scales the errors by the average absolute value of the series)
+    -   ACF1 (Autocorrelation Function at lag 1): 0.3454723 (measures the linear dependence between forecasts and actual prices one period apart)\
+
+    ```{r}
+     #Forecasting using Exponentially Weighted Moving Average (EWMA)
+    stock_price_es = ses(stock_price, h = 500, alpha = 0.6)
+    accuracy(stock_price_es)
+    ```
+```{r}
+    plot(stock_price_es)
+```
+
+**Forecasting with Time-Series Data (Univariate) : ARIMA \| GARCH\
+\
+Augmented Dickey-Fuller (ADF) test\
+\
+Objective:** to assess the stationarity of a time series data on HUL daily stocjk prise using the Augmented Dickey-Fuller (ADF) test.
+
+**Results:**
+
+The ADF test output indicates:
+
+-   Dickey-Fuller Statistic: -3.956
+
+-   Lag Order: 11
+
+-   p-value: 0.01119
+
+## **Analysis**
+
+-   A negative Dickey-Fuller statistic suggests rejection of the null hypothesis (H0) of non-stationarity.
+
+-   The p-value (0.01119) is less than the commonly used significance level of 0.05. This further strengthens the evidence against non-stationarity.
+
+-   Therefore, based on the ADF test results, we can conclude that the stock price data is likely stationary.
+
+```{r}
+adf_test_stock_price = adf.test(stock_price);
+adf_test_stock_price 
+# H0 - Not Stationary (>0.05)
+# H1 - Stationary (<0.05)
+```
+
+**Stock return data**
+
+To get Stock return the stock price data is transformed by taking the log difference of stock price.
+
+```{r}
+stock_return = na.omit(diff(log(stock_price)));
+plot(stock_return)
+```
+
+**Augmented Dickey-Fuller (ADF) test for stationarity on the daily returns**
+
+**Result:\
+**The Augmented Dickey-Fuller test for stationarity on HUL daily price and returns yields the following results:\
+- Dickey-Fuller statistic: -11.087\
+- Lag order: 11\
+- p-value: 0.01\
+- Alternative hypothesis: Stationary
+
+**Managerial Implication:\
+**The ADF test suggests that both daily stock returns and daily price of HUL stock is stationary.\
+We can go ahead with out prediction by using any data, stock price or stock return. This report focus on prediction using Stock return data.
+
+```{r}
+#ADF test for Stationery on stock return 
+
+adf_test1_stock_return = adf.test(stock_return); adf_test1_stock_return
+```
+
+**Ljung-Box test for autocorrelation on the daily returns**
+
+**Result:**
+
+X-squared statistic: 5.5273
+
+Degrees of freedom:1
+
+p-value: 0.01872
+
+**Implication:\
+**The Ljung-Box test indicates significant autocorrelation in the HUL stock daily returns. The smaller p-value (smaller than 0.05) suggests evidence against the null hypothesis of no autocorrelation.
+
+**Action:\
+**Given the presence of autocorrelation, it may be advisable to consider an autoARIMA model for time series forecasting. AutoARIMA can help in automatically selecting an appropriate ARIMA model with differencing to account for the observed autocorrelation.
+
+```{r}
+#Ljung-Box test for autocorrelation on the daily returns of HUL stock.
+lb_test_stock_return = Box.test(stock_return);
+lb_test_stock_return
+# H0 - No Auto-correlation (>0.05) 
+# H1 - Auto-correlation exists (<0.05)
+```
+
+**ACF PACF TEST** To get the Order of p and q in Arima
+
+```{r}
+acf(stock_return)
+pacf(stock_return) 
+# ACF of Stock returns (Stationary) Series
+# PACF of Stock returns and price (Stationary) Series
+# p(ACF) and q(PACF) values for ARIMA
+```
+
+**AutoARIMA modeling on the daily returns**
+
+The `auto.arima` function to automatically identify and fit an ARIMA model for the `stock_return` data.
+
+**Result:** The output indicates:
+
+-   Model: ARIMA(0,0,1) - This means there are no autoregressive (AR) terms, one moving average (MA) term of order 1, and a non-zero mean.
+
+-   Coefficients:
+
+    -   ma1: -0.0658 (coefficient of the MA term)
+
+    -   mean: 5e-04 (estimated mean of the series)
+
+-   Statistics:
+
+    -   sigma\^2: 0.0002107 (variance of the error term)
+
+    -   Log likelihood: 4165.09 (measure of model fit)
+
+-   Information Criteria:
+
+    -   AIC: -8324.19
+
+    -   AICc: -8324.17
+
+    -   BIC: -8308.29 (lower values indicate better model fit)
+
+    **Implication:** The autoARIMA models provide a statistical framework to capture the underlying patterns in daily returns of HUL stock. These models can be used for forecasting future values, and the AIC, AICc, and BIC values help in model comparison.
+
+```{r}
+#Auto Arima 
+arma_pq_stock_return = auto.arima(stock_return); 
+arma_pq_stock_return
+```
+
+**Determining Residuals of Auto ARIMA model**
+
+The provided residuals represent the differences between the observed stock returns and the values predicted by the Auto ARIMA model. These residuals are essential indicators of model accuracy. Positive residuals suggest underestimation of returns, while negative residuals indicate overestimation. Close-to-zero residuals imply a good fit between observed and predicted values, whereas larger residuals may signal areas where the model could be improved. Managers should closely monitor residuals to identify opportunities for refining the model and enhancing forecasting accuracy.
+
+```{r}
+Residuals_returns = arma_pq_stock_return$residuals
+head(Residuals_returns)
+```
+
+```{r}
+#length of residuals of stock return data 
+length(Residuals_returns)
+```
+
+**Visualization of residual of stock return**
+
+```{r}
+plot(Residuals_returns)
+```
+
+**Ljung-Box test for autocorrelation on the residuals of the ARIMA model.**\
+\
+**Results:**\
+Ljung-Box Test for Autocorrelation on Residuals:\
+- X-squared statistic: 0.0066014\
+- Degrees of freedom: 1\
+- p-value: 0.9352\
+\
+**Implication:**\
+The Ljung-Box test indicates significant autocorrelation in the residuals of the ARIMA(0, 0, 1) model. The High p-value (0.9352) suggests that there is no evidence against the null hypothesis of no autocorrelation.\
+\
+**Action:** Since the Residuals have no auto-correlation the ARIMA model is appropriate and We do forecasting using ARIMA model
+
+```{r}
+lb_test_arma_pq_stock_return = Box.test(Residuals_returns);
+lb_test_arma_pq_stock_return
+# H0 - No Auto-correlation { Favourable }
+# H1 - Auto-correlationn Exists
+#After this no autocorrelation exists
+```
+
+**Forecasting using ARIMA model**\
+Generated forecasts for the next 500 time points using the fitted ARIMA model.\
+\
+**Plot:\
+**The plot displays the original time series of daily returns along with the forecasted values.\
+\
+**Implication:** The ARIMA(0, 0, 1) model is fitted to the historical daily returns of HUL stock, providing insights into the underlying patterns. The generated forecast can be used for future predictions, and the plot visually represents the model's performance.**\
+**
+
+```{r}
+stock_return_fpq_20 = forecast(arma_pq_stock_return, h = 500)
+plot(stock_return_fpq_20)
+```
+
+**Test for Volatility Clustering and heteroscedasticity : Box Test and Arch test**
+
+**Results:**
+
+1.  Box Test for Volatility Clustering:
+    -   X-squared statistic: 113.93
+    -   Degrees of freedom: 1
+    -   p-value: \< 2.2e-16 Inference: The Box test indicates significant evidence against the null hypothesis, suggesting that the return variance series exhibits volatility clustering.
+2.  ARCH Test for heteroscedasticity:
+    -   Chi-squared statistic: 240.15
+    -   Degrees of freedom: 10
+    -   p-value: \<2.2e-16\
+        Inference: The ARCH test also provides strong evidence against the null hypothesis, supporting the presence of ARCH effects in the return series. This implies that the returns have heteroscedasticity.
+
+**Implication:**\
+The results from both tests suggest that the residuals of the ARIMA(0, 0, 1) model exhibit volatility clustering or heteroskedasticity. This suggest we should go for GARCH Modeling for further analysis and forecasting.
+
+```{r}
+# Test for Volatility Clustering: Box Test 
+lb_test_arma_pq_stock_return_square = Box.test(Residuals_returns^2);
+lb_test_arma_pq_stock_return_square
+
+# Test for heteroscedasticity: ARCH Test
+Residual_square_arch_test_returns = ArchTest(Residuals_returns^2, lags = 10)
+Residual_square_arch_test_returns
+```
+
+***GARCH Modelling***\
+\
+**Result**
+
+-   **Log-likelihood:** 9357.344
+
+-   **Information Criteria:** Akaike (-12.640), Bayes (-12.625), Shibata (-12.640), Hannan-Quinn (1-12.634) - Lower values indicate better fit.
+
+-   **Tests:**
+
+    -   Ljung-Box tests on standardized residuals suggest rejection of no serial correlation (meaning there might be serial correlation in the residuals).
+
+    -   Ljung-Box tests on standardized squared residuals don't reject no serial correlation.
+
+    -   ARCH LM tests fail to reject ARCH effects
+
+Analysis:\
+The GARCH(1,1) model seems to capture some aspects of the volatility dynamics in the squared residuals.
+
+```{r}
+#Garch model return 
+garch_model1_return = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(0,0), include.mean = TRUE))
+
+Residuals_square_garch1_return = ugarchfit(garch_model1_return, data = Residuals_returns^2);
+Residuals_square_garch1_return
+```
+
+**GARCH Residual**
+
+```{r}
+#GARCH Residual 
+GARCH_Residuals_return = residuals(Residuals_square_garch1_return)
+plot(GARCH_Residuals_return)
+```
+
+**Tests for the presence of ARCH effects (Autoregressive Conditional Heteroscedasticity) in the squared residuals**
+
+The output shows the results of an ARCH LM-test:
+
+-   Chi-squared statistic: 288.64
+
+-   Degrees of freedom (df): 20
+
+-   p-value: less than 2.2e-16 (essentially 0)
+
+    **Analysis:** A very high Chi-squared statistic and a p-value close to zero provide strong evidence against the null hypothesis of no ARCH effects. This suggests that the squared residuals exhibit heteroscedasticity, meaning the variance of the residuals is not constant over time.
+
+**Note:** Since the test is performed on squared residuals of a GARCH model, this doesn't necessarily imply heteroscedasticity in the original data. However, it highlights potential issues with the GARCH model's ability to fully capture the volatility dynamics.
+
+**Managerial Implication**
+
+-   The presence of ARCH effects indicates that the GARCH model might not be the most suitable choice for capturing the volatility dynamics in the data.
+
+-   It might be necessary to explore alternative GARCH models with higher order terms or explore other volatility modeling techniques.
+
+```{r}
+#test of heteroscedasticity
+GARCH_Residuals_square_arch_test_return = ArchTest(GARCH_Residuals_return, lags = 20)
+GARCH_Residuals_square_arch_test_return
+```
+
+**If there would have been no ARCH effect the we would have further fitted the GARCH model in original Stock return data using the following code**
+
+```{r}
+garch_model_stock_return = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(0,1), include.mean = TRUE))
+
+stock_return_Garch_model_1 = ugarchfit(garch_model_stock_return, data = stock_return);
+stock_return_Garch_model_1
+```
+
+-   **Forecasting: And then we would have foretasted the data using the following code**
+    -   The forecast horizon is 50 periods.
+
+    -   For each forecasted period, the predicted value of the series (stock return) and the corresponding standard deviation (sigma) are provided.
+
+```{r}
+# GARCH Forecast
+nse_ret_garch_forecast = ugarchforecast(stock_return_Garch_model_1, n.ahead = 50); nse_ret_garch_forecast
+plot(nse_ret_garch_forecast)
+```
